@@ -21,7 +21,7 @@ RPi_HOST = "10.0.0.17"
 localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
-CLIENT_ID= b"RPi_Logger"
+CLIENT_ID = b"RPi_Logger"
 localTimeOut = 120			# Local MQTT session timeout
 
 
@@ -194,6 +194,3 @@ if __name__ == "__main__":
         print("Connection to MQTT broker failed")
     
     client.loop_forever()
-    
-
-    
