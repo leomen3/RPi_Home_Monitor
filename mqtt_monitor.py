@@ -138,7 +138,7 @@ def update_records(service, entries, currTime, topic, value):
     range = "InputData!A"+line_num+":D"+line_num
 
     # How the input data should be interpreted.
-    value_input_option = 'RAW'
+    value_input_option = 'USER_ENTERED'
 
     values = [ [ currTime, topic, value  ] ]
     body = {'values': values}
@@ -156,7 +156,7 @@ def update_records(service, entries, currTime, topic, value):
 
 def update_entries(service,entries):
     range = NUM_ENTRIES_CELL
-    value_input_option = 'RAW'
+    value_input_option = 'USER_ENTERED'
     values = [
         [
            entries
