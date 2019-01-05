@@ -181,7 +181,7 @@ if __name__ == "__main__":
             service = create_service()
             connected = True
         except:
-            print ("failed to connect to google sheets, retruing")
+            print ("failed to connect to google sheets, retrying")
             time.sleep(1)
 
     client = mqtt.Client()
