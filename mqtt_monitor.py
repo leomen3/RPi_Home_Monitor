@@ -1,3 +1,4 @@
+#!/usr/bin/env python
  ###########################################################################
 # 1) connect to the MQTT broker
 # 2) subscribe to the available data streams
@@ -17,16 +18,17 @@ from oauth2client.file import Storage
 import telepot
 import json
 
-RPi_HOST = "10.0.0.17"
+RPi_HOST = "10.0.0.18"
 localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
-CLIENT_ID = b"RPi_Logger"
+RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets
 localTimeOut = 120			# Local MQTT session timeout
-
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+last_record = {}
 
 # get configuration from json
-with open('config.json', 'r') as f:
+with open( os.path.join(__location__, 'config.json'), 'r') as f:
     config = json.load(f)
 
 telegramToken = config['telegramToken']
@@ -66,29 +68,38 @@ def on_connect(client, userdata, flags, rc):
 
 
 def notifyTelegram(message):
+    print("Notifying Telegram: "+message)
     bot.sendMessage(504721552, message)
 
 
-def checkLimits(topic, value):
+def limitsExsess(topic, value):
     """ Check the value for limits according to topic.
     If out of limit, notify over telegram"""
 
-    val = int(value)
+    val = float(value)
     if "temperature" in topic:
         if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
             notifyTelegram("Temperature out of bounds: "+value+"degC")
+            return True
+    return False
 
 
 def on_message(client, userdata, msg):
     # The callback for when a PUBLISH message is received from the server.
     global service
+    global last_record
     currTime = getDateTime()
-    entries = number_of_entries(service)
     topic = msg.topic
+    if topic not in last_record:
+        last_record[topic] = 0
     value = str(msg.payload)
     print("time: "+str(currTime)+","+msg.topic+" "+str(msg.payload))
-    update_records(service, entries, currTime, topic, value)
-    checkLimits(topic, value)
+    timer = time.time()
+    if limitsExsess(topic, value) or (timer-last_record[topic]) > RECORD_INTERVAL:
+        print("Updating records")
+        update_records(topic, value)
+        last_record[topic] = timer    
+    return
 
 
 def get_credentials():
@@ -133,7 +144,10 @@ def number_of_entries(service):
     return int(value[0][0])
 
 
-def update_records(service, entries, currTime, topic, value):
+def update_records(topic, value):
+    global seconds
+    entries = number_of_entries(service)
+    currTime = getDateTime()
     line_num = str(2 + entries)
     range = "InputData!A"+line_num+":D"+line_num
 
