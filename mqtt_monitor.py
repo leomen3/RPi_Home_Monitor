@@ -23,6 +23,7 @@ localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
 RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets
+HOME_DIR = '/home/pi'   #home directory
 localTimeOut = 120			# Local MQTT session timeout
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 last_record = {}
@@ -111,7 +112,8 @@ def get_credentials():
     Returns:
         Credentials, the obtained credential.
     """
-    home_dir = os.path.expanduser('~')
+    #home_dir = os.path.expanduser('~')
+    home_dir = (HOME_DIR)
     credential_dir = os.path.join(home_dir, '.credentials')
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
@@ -184,16 +186,17 @@ def update_entries(service,entries):
 
 if __name__ == "__main__":
     global service
-    connected = False
+    connectedGoogle = False
+    connectedMQTT = False
 
     #establish Telegram Bot
     bot = telepot.Bot(telegramToken)
     bot.getMe()
 
-    while not connected:
+    while not connectedGoogle:
         try:
             service = create_service()
-            connected = True
+            connectedGoogle = True
         except:
             print ("failed to connect to google sheets, retrying")
             time.sleep(1)
@@ -202,9 +205,12 @@ if __name__ == "__main__":
     client.on_connect = on_connect
     client.on_message = on_message
 
-    try:
-        client.connect(localBroker, localPort, localTimeOut)
-    except:
-        print("Connection to MQTT broker failed")
+    while not connectedMQTT:
+        try:
+            client.connect(localBroker, localPort, localTimeOut)
+            connectedMQTT = True
+        except:
+            print("Connection to MQTT broker failed")
+            time.sleep(1)
     
     client.loop_forever()
