@@ -44,6 +44,7 @@ SHEET_ID = 0
 #limits
 MAX_TEMPERATURE = 30
 MIN_TEMPERATURE = 15
+topicsOfInterest = ["/sensor/Chipa/humidity","/sensor/Chipa/temperature"]
 
 
 def getDateTime():
@@ -91,16 +92,23 @@ def on_message(client, userdata, msg):
     global last_record
     currTime = getDateTime()
     topic = msg.topic
+    if topic not in topicsOfInterest:
+        return
     if topic not in last_record:
         last_record[topic] = 0
     value = str(msg.payload)
     print("time: "+str(currTime)+","+msg.topic+" "+str(msg.payload))
     timer = time.time()
-    if limitsExsess(topic, value) or (timer-last_record[topic]) > RECORD_INTERVAL:
+    if limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
         print("Updating records")
         update_records(topic, value)
         last_record[topic] = timer    
     return
+
+
+def on_disconnect(client, userdata,rc=0):
+    print("DisConnected result code "+str(rc))
+    client.loop_stop()
 
 
 def get_credentials():
@@ -207,10 +215,13 @@ if __name__ == "__main__":
 
     while not connectedMQTT:
         try:
-            client.connect(localBroker, localPort, localTimeOut)
+            client.connect(localBroker, localPort, keepalive = 6000)
             connectedMQTT = True
         except:
             print("Connection to MQTT broker failed")
             time.sleep(1)
     
-    client.loop_forever()
+    client.loop_start()
+    while True:
+        time.sleep(10)
+        client.publish("/empty",None)
