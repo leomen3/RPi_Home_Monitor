@@ -18,7 +18,7 @@ from oauth2client.file import Storage
 import telepot
 import json
 
-RPi_HOST = "10.0.0.18"
+RPi_HOST = "10.0.0.19"
 localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
@@ -44,7 +44,12 @@ SHEET_ID = 0
 #limits
 MAX_TEMPERATURE = 30
 MIN_TEMPERATURE = 15
-topicsOfInterest = ["/sensor/Chipa/humidity","/sensor/Chipa/temperature"]
+topicsOfInterest = ["/sensor/Chipa/humidity",
+    "/sensor/Chipa/temperature",
+    "/sensor/Chipa/CO",
+    "/sensor/Chipa/All_Gas"]
+CARBON_MONOXIDE_ADC_THRESH = 3000
+GAS_ALL_ADC_THRESH = 4500
 
 
 def getDateTime():
@@ -83,6 +88,14 @@ def limitsExsess(topic, value):
         if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
             notifyTelegram("Temperature out of bounds: "+value+"degC")
             return True
+    if "CO" in topic:
+        if  val > CARBON_MONOXIDE_ADC_THRESH:
+            notifyTelegram("Carbon Monoxide level above threshold: "+value)
+            return True
+    if "All_Gas" in topic:
+        if  val > GAS_ALL_ADC_THRESH:
+            notifyTelegram("Poison gas level above threshold: "+value)
+            return True
     return False
 
 
@@ -92,12 +105,13 @@ def on_message(client, userdata, msg):
     global last_record
     currTime = getDateTime()
     topic = msg.topic
+    print("time: "+str(currTime)+","+msg.topic+" "+str(msg.payload))
     if topic not in topicsOfInterest:
+        print("Topic: ",topic," from ",msg," not in the interest list")
         return
     if topic not in last_record:
         last_record[topic] = 0
     value = str(msg.payload)
-    print("time: "+str(currTime)+","+msg.topic+" "+str(msg.payload))
     timer = time.time()
     if limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
         print("Updating records")
@@ -123,6 +137,7 @@ def get_credentials():
     #home_dir = os.path.expanduser('~')
     home_dir = (HOME_DIR)
     credential_dir = os.path.join(home_dir, '.credentials')
+    print("Credentials folder: ",credential_dir)
     if not os.path.exists(credential_dir):
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
