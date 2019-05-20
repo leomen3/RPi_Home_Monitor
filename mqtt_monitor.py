@@ -7,6 +7,7 @@
 ###########################################################################
 
 import time
+import datetime
 import os
 import string
 import paho.mqtt.client as mqtt
@@ -17,6 +18,8 @@ from oauth2client import tools
 from oauth2client.file import Storage
 import telepot
 import json
+from influxdb import InfluxDBClient
+import sys
 
 RPi_HOST = "10.0.0.19"
 localBroker = RPi_HOST		# Local MQTT broker
@@ -27,6 +30,7 @@ HOME_DIR = '/home/pi'   #home directory
 localTimeOut = 120			# Local MQTT session timeout
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 last_record = {}
+
 
 # get configuration from json
 with open( os.path.join(__location__, 'config.json'), 'r') as f:
@@ -170,7 +174,6 @@ def number_of_entries(service):
 
 
 def update_records(topic, value):
-    global seconds
     entries = number_of_entries(service)
     currTime = getDateTime()
     line_num = str(2 + entries)
@@ -190,10 +193,26 @@ def update_records(topic, value):
 
     response = request.execute()
     update_entries(service,entries+1)
+
+    # Update InfluxDB
+    receiveTime = datetime.datetime.utcnow()
+    json_body = [
+        {
+            "measurement": topic,
+            "time": receiveTime,
+            "fields": {
+                "value": float(value)
+            }
+        }
+    ]
+    print("Writing to InfluxDB: ", json_body)
+    dbclient.write_points(json_body)
+
     return response
 
 
 def update_entries(service,entries):
+    #Update Google Sheet
     range = NUM_ENTRIES_CELL
     value_input_option = 'USER_ENTERED'
     values = [
@@ -205,12 +224,15 @@ def update_entries(service,entries):
                                                      valueInputOption=value_input_option, body=body
                                                      )
     response = request.execute()
+
     return response
 
 if __name__ == "__main__":
     global service
     connectedGoogle = False
     connectedMQTT = False
+    global dbclient
+    dbclient = InfluxDBClient('localhost', 8086, 'leo', '333', 'sensors')
 
     #establish Telegram Bot
     bot = telepot.Bot(telegramToken)
@@ -234,6 +256,7 @@ if __name__ == "__main__":
             connectedMQTT = True
         except:
             print("Connection to MQTT broker failed")
+            print("exception: ",sys.exc_info()[0])
             time.sleep(1)
     
     client.loop_start()
