@@ -25,7 +25,7 @@ RPi_HOST = "10.0.0.19"
 localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
-RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets
+RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets and InfluxDB
 HOME_DIR = '/home/pi'   #home directory
 localTimeOut = 120			# Local MQTT session timeout
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -48,16 +48,19 @@ SHEET_ID = 0
 #limits
 MAX_TEMPERATURE = 30
 MIN_TEMPERATURE = 15
+CARBON_MONOXIDE_ADC_THRESH = 3000
+GAS_ALL_ADC_THRESH = 4500
+
+WARM_UP_THRESH = 300  # number of seconds from start up, after which start up sensors are sample
+
 topicsOfInterest = ["/sensor/Chipa/humidity",
     "/sensor/Chipa/temperature",
     "/sensor/Chipa/CO",
     "/sensor/Chipa/All_Gas"]
-CARBON_MONOXIDE_ADC_THRESH = 3000
-GAS_ALL_ADC_THRESH = 4500
 
 
-def getDateTime():
-    return time.ctime()
+def getUTC_TIME():
+    return datetime.datetime.utcnow()
 
 
 def pushSample(sample, topic):
@@ -93,11 +96,11 @@ def limitsExsess(topic, value):
             notifyTelegram("Temperature out of bounds: "+value+"degC")
             return True
     if "CO" in topic:
-        if  val > CARBON_MONOXIDE_ADC_THRESH:
+        if  warmedUp and val > CARBON_MONOXIDE_ADC_THRESH:
             notifyTelegram("Carbon Monoxide level above threshold: "+value)
             return True
     if "All_Gas" in topic:
-        if  val > GAS_ALL_ADC_THRESH:
+        if  warmedUp and val > GAS_ALL_ADC_THRESH:
             notifyTelegram("Poison gas level above threshold: "+value)
             return True
     return False
@@ -107,9 +110,9 @@ def on_message(client, userdata, msg):
     # The callback for when a PUBLISH message is received from the server.
     global service
     global last_record
-    currTime = getDateTime()
+    currTime = getUTC_TIME()
     topic = msg.topic
-    print("time: "+str(currTime)+","+msg.topic+" "+str(msg.payload))
+    print("UTCtime: "+currTime.ctime()+","+msg.topic+" "+str(msg.payload))
     if topic not in topicsOfInterest:
         print("Topic: ",topic," from ",msg," not in the interest list")
         return
@@ -174,8 +177,25 @@ def number_of_entries(service):
 
 
 def update_records(topic, value):
+
+    # Update InfluxDB
+    receiveTime = getUTC_TIME()
+    json_body = [
+        {
+            "measurement": topic,
+            "time": receiveTime,
+            "fields": {
+                "value": float(value)
+            }
+        }
+    ]
+    print("Writing to InfluxDB: ", json_body)
+    dbclient.write_points(json_body)
+    return
+
+'''     #update Google Sheets
     entries = number_of_entries(service)
-    currTime = getDateTime()
+    currTime = getUTC_TIME()
     line_num = str(2 + entries)
     range = "InputData!A"+line_num+":D"+line_num
 
@@ -194,21 +214,7 @@ def update_records(topic, value):
     response = request.execute()
     update_entries(service,entries+1)
 
-    # Update InfluxDB
-    receiveTime = datetime.datetime.utcnow()
-    json_body = [
-        {
-            "measurement": topic,
-            "time": receiveTime,
-            "fields": {
-                "value": float(value)
-            }
-        }
-    ]
-    print("Writing to InfluxDB: ", json_body)
-    dbclient.write_points(json_body)
-
-    return response
+    return response '''
 
 
 def update_entries(service,entries):
@@ -232,7 +238,10 @@ if __name__ == "__main__":
     connectedGoogle = False
     connectedMQTT = False
     global dbclient
+    global warmedUp    #indicate WARM UP Threshold passed, and gas filters can be sampled
+    warmedUp = False   #indicate WARM UP Threshold passed, and gas filters can be sampled
     dbclient = InfluxDBClient('localhost', 8086, 'leo', '333', 'sensors')
+    startTime = time.time()
 
     #establish Telegram Bot
     bot = telepot.Bot(telegramToken)
@@ -263,3 +272,5 @@ if __name__ == "__main__":
     while True:
         time.sleep(10)
         client.publish("/empty",None)
+        if not warmedUp:
+            warmedUp = (time.time() - startTime) > WARM_UP_THRESH
