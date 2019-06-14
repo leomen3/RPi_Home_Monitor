@@ -48,8 +48,8 @@ SHEET_ID = 0
 #limits
 MAX_TEMPERATURE = 30
 MIN_TEMPERATURE = 15
-CARBON_MONOXIDE_ADC_THRESH = 3000
-GAS_ALL_ADC_THRESH = 4500
+CARBON_MONOXIDE_ADC_THRESH = 3300
+GAS_ALL_ADC_THRESH = 10000
 
 WARM_UP_THRESH = 300  # number of seconds from start up, after which start up sensors are sample
 
