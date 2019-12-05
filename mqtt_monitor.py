@@ -11,17 +11,18 @@ import datetime
 import os
 import string
 import paho.mqtt.client as mqtt
-import requests
-from googleapiclient import discovery
-from oauth2client import client
-from oauth2client import tools
-from oauth2client.file import Storage
+#import requests
+#from googleapiclient import discovery
+#from oauth2client import client
+#from oauth2client import tools
+#from oauth2client.file import Storage
 import telepot
 import json
 from influxdb import InfluxDBClient
 import sys
 
-RPi_HOST = "10.0.0.19"
+DEBUG = False
+RPi_HOST = "10.0.0.19" 
 localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
@@ -48,15 +49,16 @@ SHEET_ID = 0
 #limits
 MAX_TEMPERATURE = 30
 MIN_TEMPERATURE = 15
-CARBON_MONOXIDE_ADC_THRESH = 3300
-GAS_ALL_ADC_THRESH = 10000
+CARBON_MONOXIDE_ADC_THRESH = 5000
+GAS_ALL_ADC_THRESH = 12000
 
 WARM_UP_THRESH = 300  # number of seconds from start up, after which start up sensors are sample
 
 topicsOfInterest = ["/sensor/Chipa/humidity",
     "/sensor/Chipa/temperature",
     "/sensor/Chipa/CO",
-    "/sensor/Chipa/All_Gas"]
+    "/sensor/Chipa/All_Gas",
+    "/sensor/livingRoom/alarm"]
 
 
 def getUTC_TIME():
@@ -91,6 +93,8 @@ def limitsExsess(topic, value):
     If out of limit, notify over telegram"""
 
     val = float(value)
+    if DEBUG:
+        print("Validating excess on topic: ",topic, "value: ",str(val))
     if "temperature" in topic:
         if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
             notifyTelegram("Temperature out of bounds: "+value+"degC")
@@ -103,11 +107,17 @@ def limitsExsess(topic, value):
         if  warmedUp and val > GAS_ALL_ADC_THRESH:
             notifyTelegram("Poison gas level above threshold: "+value)
             return True
+    if "alarm" in topic:
+        if int(val) == 1:
+            notifyTelegram("ALARM in Living room is On!")
+            return True
     return False
 
 
 def on_message(client, userdata, msg):
     # The callback for when a PUBLISH message is received from the server.
+    if DEBUG:
+        print("COMMMMMMON1")
     global service
     global last_record
     currTime = getUTC_TIME()
@@ -120,7 +130,9 @@ def on_message(client, userdata, msg):
         last_record[topic] = 0
     value = str(msg.payload)
     timer = time.time()
-    if limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
+    if DEBUG:
+        print("COMMMMMMON2")
+    if True:#limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
         print("Updating records")
         update_records(topic, value)
         last_record[topic] = timer    
@@ -191,6 +203,8 @@ def update_records(topic, value):
     ]
     print("Writing to InfluxDB: ", json_body)
     dbclient.write_points(json_body)
+    if DEBUG:
+        print("writing: ",value, " from topic: ", topic) 
     return
 
 '''     #update Google Sheets
@@ -240,20 +254,20 @@ if __name__ == "__main__":
     global dbclient
     global warmedUp    #indicate WARM UP Threshold passed, and gas filters can be sampled
     warmedUp = False   #indicate WARM UP Threshold passed, and gas filters can be sampled
-    dbclient = InfluxDBClient('localhost', 8086, 'leo', '333', 'sensors')
+    dbclient = InfluxDBClient(RPi_HOST, 8086, 'leo', '333', 'sensors')
     startTime = time.time()
 
     #establish Telegram Bot
     bot = telepot.Bot(telegramToken)
     bot.getMe()
 
-    while not connectedGoogle:
-        try:
-            service = create_service()
-            connectedGoogle = True
-        except:
-            print ("failed to connect to google sheets, retrying")
-            time.sleep(1)
+    # while not connectedGoogle:
+    #     try:
+    #         service = create_service()
+    #         connectedGoogle = True
+    #     except:
+    #         print ("failed to connect to google sheets, retrying")
+    #         time.sleep(1)
 
     client = mqtt.Client()
     client.on_connect = on_connect
