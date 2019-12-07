@@ -27,10 +27,12 @@ localBroker = RPi_HOST		# Local MQTT broker
 localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
 RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets and InfluxDB
+NOTIFY_INTERVAL = 1*60   #number if seconds between subsequent notification on telegram
 HOME_DIR = '/home/pi'   #home directory
 localTimeOut = 120			# Local MQTT session timeout
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 last_record = {}
+last_notify = {}
 
 
 # get configuration from json
@@ -87,28 +89,40 @@ def notifyTelegram(message):
     print("Notifying Telegram: "+message)
     bot.sendMessage(504721552, message)
 
+def isNotifyTime(topic):
+    timer = time.time()
+    global last_notify
+    if topic not in last_notify:
+        last_notify[topic] = 0
+        result = True  #if event happens for first time, notify
+    else:
+        result = (timer - last_notify[topic]) > NOTIFY_INTERVAL  
+        last_notify[topic] = timer  # update occurance
+    return result
+
 
 def limitsExsess(topic, value):
     """ Check the value for limits according to topic.
     If out of limit, notify over telegram"""
 
     val = float(value)
-    if "temperature" in topic:
-        if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
-            notifyTelegram("Temperature out of bounds: "+value+"degC")
-            return True
-    if "CO" in topic:
-        if  warmedUp and val > CARBON_MONOXIDE_ADC_THRESH:
-            notifyTelegram("Carbon Monoxide level above threshold: "+value)
-            return True
-    if "All_Gas" in topic:
-        if  warmedUp and val > GAS_ALL_ADC_THRESH:
-            notifyTelegram("Poison gas level above threshold: "+value)
-            return True
-    if "alarm" in topic:
-        if int(val) == 1:
-            notifyTelegram("ALARM in Living room is On!")
-            return True
+    if isNotifyTime(topic):
+        if "temperature" in topic:
+            if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
+                notifyTelegram("Temperature out of bounds: "+value+"degC")
+                return True
+        if "CO" in topic:
+            if  warmedUp and val > CARBON_MONOXIDE_ADC_THRESH:
+                notifyTelegram("Carbon Monoxide level above threshold: "+value)
+                return True
+        if "All_Gas" in topic:
+            if  warmedUp and val > GAS_ALL_ADC_THRESH:
+                notifyTelegram("Poison gas level above threshold: "+value)
+                return True
+        if "alarm" in topic:
+            if int(val) == 1:
+                notifyTelegram("ALARM in Living room is On!")
+                return True
     return False
 
 
