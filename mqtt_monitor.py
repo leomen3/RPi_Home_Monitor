@@ -93,8 +93,6 @@ def limitsExsess(topic, value):
     If out of limit, notify over telegram"""
 
     val = float(value)
-    if DEBUG:
-        print("Validating excess on topic: ",topic, "value: ",str(val))
     if "temperature" in topic:
         if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
             notifyTelegram("Temperature out of bounds: "+value+"degC")
@@ -116,8 +114,6 @@ def limitsExsess(topic, value):
 
 def on_message(client, userdata, msg):
     # The callback for when a PUBLISH message is received from the server.
-    if DEBUG:
-        print("COMMMMMMON1")
     global service
     global last_record
     currTime = getUTC_TIME()
@@ -130,9 +126,7 @@ def on_message(client, userdata, msg):
         last_record[topic] = 0
     value = str(msg.payload)
     timer = time.time()
-    if DEBUG:
-        print("COMMMMMMON2")
-    if True:#limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
+    if limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
         print("Updating records")
         update_records(topic, value)
         last_record[topic] = timer    
@@ -203,8 +197,6 @@ def update_records(topic, value):
     ]
     print("Writing to InfluxDB: ", json_body)
     dbclient.write_points(json_body)
-    if DEBUG:
-        print("writing: ",value, " from topic: ", topic) 
     return
 
 '''     #update Google Sheets
