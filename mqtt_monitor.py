@@ -22,9 +22,6 @@ from influxdb import InfluxDBClient
 import sys
 
 DEBUG = False
-RPi_HOST = "10.0.0.19" 
-localBroker = RPi_HOST		# Local MQTT broker
-localPort = 1883			# Local MQTT port
 UTC_OFFSET = 3   # hours of differenc between UTC and local (Jerusalem) time
 RECORD_INTERVAL = 5*60   #number if seconds between subsequent recods in google sheets and InfluxDB
 NOTIFY_INTERVAL = 1*60   #number if seconds between subsequent notification on telegram
@@ -40,6 +37,7 @@ with open( os.path.join(__location__, 'config.json'), 'r') as f:
     config = json.load(f)
 
 telegramToken = config['telegramToken']
+RPi_HOST = config['RPi_HOST']
 SPREADSHEET_ID = config['SPREADSHEET_ID']
 API_KEY = config['API_KEY']
 SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
@@ -47,6 +45,8 @@ CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Sheets API Python Quickstart'
 NUM_ENTRIES_CELL = "InputData!E2"
 SHEET_ID = 0
+localBroker = RPi_HOST		# Local MQTT broker
+localPort = 1883			# Local MQTT port
 
 #limits
 MAX_TEMPERATURE = 30
@@ -60,7 +60,9 @@ topicsOfInterest = ["/sensor/Chipa/humidity",
     "/sensor/Chipa/temperature",
     "/sensor/Chipa/CO",
     "/sensor/Chipa/All_Gas",
-    "/sensor/livingRoom/alarm"]
+    "/sensor/livingRoom/alarm",
+    "/sensor/MotionHUE"
+    ]
 
 
 def getUTC_TIME():
@@ -122,6 +124,10 @@ def limitsExsess(topic, value):
         if "alarm" in topic:
             if int(val) == 1:
                 notifyTelegram("ALARM in Living room is On!")
+                return True
+        if "MotionHUE" in topic:
+            if int(val) == 1:
+                notifyTelegram("HUE Motion sensor detected movement!")
                 return True
     return False
 

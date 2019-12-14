@@ -16,6 +16,10 @@ with open(os.path.join(__location__, 'config.json'), 'r') as f:
 hue_bridge_ip = config['HUE_BRIDGE_IP']
 hue_user_name = config['HUE_USER']
 motion_sensor_id = config['MOTION_SENSOR_ID']
+RPi_HOST = config['RPi_HOST']
+localBroker = RPi_HOST		# Local MQTT broker
+localPort = 1883			# Local MQTT port
+localTimeOut = 120			# Local MQTT session timeout
 pir_url = 'http://' + hue_bridge_ip + '/api/' + hue_user_name + '/sensors/'+motion_sensor_id
 
 def HUE_bridge_ip():
@@ -77,9 +81,10 @@ def run():
     try:
       now = dt.datetime.now()
       isPresenceDetected = getPirState()
-      topic = "/sensor/MotionHUE"
-      value = "1"
-      handleReading(topic, value)
+      if isPresenceDetected == True:
+        topic = "/sensor/MotionHUE"
+        value = "1"
+        handleReading(topic, value)
       print("Motion sensor status is: ", isPresenceDetected)
 
       # if pir is True:
