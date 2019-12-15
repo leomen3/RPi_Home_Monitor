@@ -61,7 +61,8 @@ topicsOfInterest = ["/sensor/Chipa/humidity",
     "/sensor/Chipa/CO",
     "/sensor/Chipa/All_Gas",
     "/sensor/livingRoom/alarm",
-    "/sensor/MotionHUE"
+    "/sensor/MotionHUE",
+    "/empty"
     ]
 
 
@@ -98,8 +99,9 @@ def isNotifyTime(topic):
         last_notify[topic] = 0
         result = True  #if event happens for first time, notify
     else:
-        result = (timer - last_notify[topic]) > NOTIFY_INTERVAL  
-        last_notify[topic] = timer  # update occurance
+        result = (timer - last_notify[topic]) > NOTIFY_INTERVAL
+        if result == True:  
+            last_notify[topic] = timer  # update occurance
     return result
 
 
@@ -107,25 +109,29 @@ def limitsExsess(topic, value):
     """ Check the value for limits according to topic.
     If out of limit, notify over telegram"""
 
-    val = float(value)
     if isNotifyTime(topic):
         if "temperature" in topic:
+            val = float(value)
             if val < MIN_TEMPERATURE or val > MAX_TEMPERATURE:
                 notifyTelegram("Temperature out of bounds: "+value+"degC")
                 return True
         if "CO" in topic:
+            val = float(value)
             if  warmedUp and val > CARBON_MONOXIDE_ADC_THRESH:
                 notifyTelegram("Carbon Monoxide level above threshold: "+value)
                 return True
         if "All_Gas" in topic:
+            val = float(value)
             if  warmedUp and val > GAS_ALL_ADC_THRESH:
                 notifyTelegram("Poison gas level above threshold: "+value)
                 return True
         if "alarm" in topic:
+            val = float(value)
             if int(val) == 1:
                 notifyTelegram("ALARM in Living room is On!")
                 return True
         if "MotionHUE" in topic:
+            val = float(value)
             if int(val) == 1:
                 notifyTelegram("HUE Motion sensor detected movement!")
                 return True
@@ -142,10 +148,12 @@ def on_message(client, userdata, msg):
     if topic not in topicsOfInterest:
         print("Topic: ",topic," from ",msg," not in the interest list")
         return
-    if topic not in last_record:
-        last_record[topic] = 0
-    value = str(msg.payload)
+    if "empty" in topic:
+        return
     timer = time.time()
+    if topic not in last_record:
+        last_record[topic] = 0    #to assure first time is updated
+    value = str(msg.payload)
     if limitsExsess(topic, value) or ((timer-last_record[topic]) > RECORD_INTERVAL):
         print("Updating records")
         update_records(topic, value)
@@ -297,6 +305,6 @@ if __name__ == "__main__":
     client.loop_start()
     while True:
         time.sleep(10)
-        client.publish("/empty",None)
+        #client.publish("/empty","0")
         if not warmedUp:
             warmedUp = (time.time() - startTime) > WARM_UP_THRESH
