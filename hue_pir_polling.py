@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import time
 import datetime as dt
 import os
@@ -76,7 +78,7 @@ def init():
             print("Connection to MQTT broker failed")
             time.sleep(1)
 
-    client.loop_start
+    client.loop_start()
 
 
 def run():
