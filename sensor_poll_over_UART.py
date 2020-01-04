@@ -31,13 +31,17 @@ def on_message(client, userdata, msg):
     return
 
 def handleReading(topic,value):
-    client.publish(topic, payload=value, qos=1, retain=True)
-    print('published: ',topic,":",value)
+    client.publish(topic, payload=value, qos=0, retain=False)
+    #print('published: ',topic,":",value)
     return
 
-client = mqtt.Client()
+def on_log(client, userdata, level, buf):
+    print("UTC: ", time.ctime(), "log: ", buf)
+
+client = mqtt.Client("environmental_poller")
 client.on_connect = on_connect
-client.on_message = on_message
+#client.on_message = on_message
+client.on_log = on_log
 connectedMQTT = False
 
 
@@ -54,16 +58,17 @@ client.loop_start()
 ser = serial.Serial('/dev/ttyUSB0', 115200)
 while True:
     rawBuf = ser.readline()
-    print("Received: ",rawBuf)
+    #print("Received: ",rawBuf)
     try:
         if SENSOR_PREFIX in rawBuf:
             reading = json.loads(rawBuf)
             topic = reading[2]
             value = reading[1]
-            print("Received: ",topic,value)
+            #print("Received: ",topic,value)
             handleReading(topic,value)
         else:
-            print("Unknown serial data from WeMos at UTC ",time.ctime() )
-            print("data: ",rawBuf )
+            #print("Unknown serial data from WeMos at UTC ",time.ctime() )
+            #print("data: ",rawBuf )
+            pass
     except:
         print("Oops!",sys.exc_info()[0],"occured.")

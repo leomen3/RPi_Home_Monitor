@@ -44,19 +44,22 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
-    print("Message received by sensor poll")
+    #print("Message received by sensor poll")
     return
 
 
 def handleReading(topic, value):
-    client.publish(topic, payload=value, qos=1, retain=True)
-    print('published: ', topic, ":", value)
+    client.publish(topic, payload=value, qos=0, retain=False)
     return
 
 
-client = mqtt.Client()
+def on_log(client, userdata, level, buf):
+    print("UTC: ", time.ctime(), "log: ", buf)
+
+client = mqtt.Client("hue_movement_poller")
 client.on_connect = on_connect
-client.on_message = on_message
+#client.on_message = on_message
+client.on_log = on_log
 
 
 def init():

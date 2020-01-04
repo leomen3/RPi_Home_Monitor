@@ -165,6 +165,8 @@ def on_disconnect(client, userdata,rc=0):
     print("DisConnected result code "+str(rc))
     client.loop_stop()
 
+def on_log(client, userdata, level, buf):
+    print("UTC: ", time.ctime(), "log: ", buf)
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -289,9 +291,11 @@ if __name__ == "__main__":
     #         print ("failed to connect to google sheets, retrying")
     #         time.sleep(1)
 
-    client = mqtt.Client()
+    client = mqtt.Client("monitor")
     client.on_connect = on_connect
     client.on_message = on_message
+    client.on_log = on_log
+
 
     while not connectedMQTT:
         try:

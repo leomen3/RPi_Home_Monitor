@@ -33,13 +33,18 @@ def on_message(client, userdata, msg):
     return
 
 def handleReading(topic,value):
-    client.publish(topic, payload=value, qos=1, retain=True)
+    client.publish(topic, payload=value, qos=0, retain=False)
     print('published: ',topic,":",value)
     return
 
-client = mqtt.Client()
+def on_log(client, userdata, level, buf):
+    print("UTC: ", time.ctime(), "log: ", buf)
+
+client = mqtt.Client("alarm_poller")
 client.on_connect = on_connect
-client.on_message = on_message
+#client.on_message = on_message
+client.on_log = on_log
+
 
 def init():
     global client
@@ -73,16 +78,17 @@ def run():
     while True:
         try:
             rawBuf = client_socket.recv(1024)
-            print("Received: ", rawBuf)
+            #print("Received: ", rawBuf)
             if SOUND_ALARM_CODE in str(rawBuf):
     #            reading = json.loads(rawBuf)
                 topic = "/sensor/livingRoom/alarm"
                 value = "1"
-                print("Received: ", topic, value, "at UTC: ", time.ctime())
+                #print("Received: ", topic, value, "at UTC: ", time.ctime())
                 handleReading(topic,value)
             else:
-                print("Unknown serial data from BT (rfcomm) at UTC ",time.ctime() )
-                print("data: ",rawBuf )
+                #print("Unknown serial data from BT (rfcomm) at UTC ",time.ctime() )
+                #print("data: ",rawBuf )
+                pass
         except Exception as e:
             print(e)
             client_socket.close()
